@@ -1,5 +1,6 @@
 # mcp-proxmox
 
+<!-- mcp-name: io.github.felhen-ai/mcp-proxmox -->
 <!-- mcp-name: io.github.antonio-mello-ai/mcp-proxmox -->
 
 <a href="https://glama.ai/mcp/servers/antonio-mello-ai/mcp-proxmox">
@@ -54,6 +55,7 @@ PROXMOX_VERIFY_SSL=false            # Default: false
    - `VM.Config.CPU` — change CPU allocation
    - `VM.Config.Memory` — change memory allocation
    - `VM.Monitor` — access QEMU monitor (for metrics)
+   - `VM.Console` — console interaction tools (screenshots, keyboard input)
    - `VM.Migrate` — migrate VMs/CTs between nodes
    - `Sys.Modify` — manage firewall rules
    - `VM.Config.Cloudinit` — configure cloud-init parameters
@@ -157,6 +159,16 @@ Add to Cursor Settings > MCP with the same configuration as above.
 
 > **Note:** `exec_command` requires `qemu-guest-agent` installed and running inside the VM. Not supported for LXC containers (Proxmox API limitation).
 
+### Console Interaction
+
+| Tool | Description |
+|------|-------------|
+| `vm_screenshot` | Capture a PNG screenshot of a QEMU VM's display (login prompt, boot messages, installer, GUI) |
+| `vm_send_key` | Send a key or combination to a VM console (requires confirmation) |
+| `vm_send_text` | Type ASCII text into a VM console (US layout; requires confirmation) |
+
+> **Note:** Console tools do not require `qemu-guest-agent` and need only the `VM.Console` privilege. `vm_screenshot` opens the same VNC websocket tunnel the Proxmox web UI uses (RFB 3.8 with DES-based VNC auth) and is implemented in pure stdlib (custom WebSocket client + DES). Only QEMU VMs are supported. Text entry is layout-dependent: `vm_send_text` maps ASCII to a US keyboard layout (Shift-mapping for uppercase and symbols); non-ASCII input (e.g. Cyrillic) is not supported by the sendkey protocol.
+
 ### Snapshots
 
 | Tool | Description |
@@ -233,6 +245,8 @@ Once connected, you can ask your AI assistant:
 - "Restore the latest backup of container 101"
 - "Run 'df -h' on VM 100"
 - "Check if nginx is running on VM 200"
+- "Take a screenshot of VM 100 so I can see the console"
+- "The VM is stuck at a login prompt — type 'root' and press Enter"
 - "Show me the network bridges on node pve"
 - "Give VM 100 more CPU — bump it to 8 cores"
 - "Add 50GB of disk to container 101"
@@ -257,6 +271,10 @@ A 403 usually means the API token is valid but does not have enough Proxmox priv
 
 `exec_command` only works for QEMU VMs with `qemu-guest-agent` installed and running inside the guest. If the tool reports that the QEMU guest agent is not responding, start or install the agent in the VM and retry. LXC containers are not supported by this Proxmox API path, so use another container access method instead.
 
+### `ModuleNotFoundError: No module named 'mcp.server.fastmcp'`
+
+The MCP Python SDK 2.0 removed the `mcp.server.fastmcp` module that mcp-proxmox 1.2.1 and earlier import. Fresh installs (`uvx mcp-proxmox`, `uv tool install`, `pip install`) resolved `mcp` 2.x and failed on startup — in Claude Desktop this only shows up as "Server disconnected". Upgrade to mcp-proxmox 1.2.2 or later, which pins `mcp<2`. If you must stay on an older mcp-proxmox, constrain the SDK yourself: `uvx --with "mcp<2" mcp-proxmox`.
+
 ### Self-signed certificate or connection errors
 
 Proxmox commonly runs on port `8006`, so check that `PROXMOX_HOST` and `PROXMOX_PORT` point to the same endpoint you use for the Proxmox web UI. For homelab clusters with self-signed certificates, leave `PROXMOX_VERIFY_SSL=false` or set it explicitly. Use `PROXMOX_VERIFY_SSL=true` only when the Proxmox certificate chains to a CA trusted by your runtime.
@@ -264,7 +282,7 @@ Proxmox commonly runs on port `8006`, so check that `PROXMOX_HOST` and `PROXMOX_
 ## Development
 
 ```bash
-git clone https://github.com/antonio-mello-ai/mcp-proxmox.git
+git clone https://github.com/felhen-ai/mcp-proxmox.git
 cd mcp-proxmox
 python -m venv .venv
 source .venv/bin/activate
@@ -284,3 +302,11 @@ mypy src/
 ## License
 
 MIT
+
+## Repository and registry compatibility
+
+The canonical repository is `https://github.com/felhen-ai/mcp-proxmox`. Existing GitHub clone and issue URLs redirect to this repository. Do not recreate a repository at the old address, which would remove those redirects.
+
+The canonical MCP Registry identifier is `io.github.felhen-ai/mcp-proxmox`. The legacy identifier `io.github.antonio-mello-ai/mcp-proxmox` remains supported with a separate `server.legacy.json` manifest. Both identifiers install the same `mcp-proxmox` package from PyPI, and the package name and CLI command remain unchanged. Keep both ownership markers in this README so future releases can be registered under either identifier.
+
+New Docker publications use `ghcr.io/felhen-ai/mcp-proxmox`. Existing images and tags at `ghcr.io/antonio-mello-ai/mcp-proxmox` are retained for compatibility; they are not deleted or silently replaced. The legacy Glama badge above remains a discovery link until that directory migrates its entry.
